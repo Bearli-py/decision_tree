@@ -1,4 +1,4 @@
-<?php
+// app/Services/ExcelParserService.php
 
 namespace App\Services;
 
@@ -7,12 +7,16 @@ use Illuminate\Http\UploadedFile;
 class ExcelParserService
 {
     /**
-     * Parse file CSV menjadi array of associative arrays
+     * Parse file upload menjadi array of associative array:
+     * [
+     *   ['Kolom1' => '...', 'Kolom2' => '...'],
+     *   ...
+     * ]
      */
     public function parseFile(UploadedFile $file): array
     {
         $filename = $file->getPathname();
-        
+
         return $this->parseCSV($filename);
     }
 
@@ -37,7 +41,7 @@ class ExcelParserService
 
         // Baca baris data
         while (($cells = fgetcsv($handle, 1000, ',')) !== false) {
-            // Skip baris kosong
+            // Skip baris yang benar-benar kosong
             if (count(array_filter($cells, fn($c) => $c !== null && trim($c) !== '')) === 0) {
                 continue;
             }

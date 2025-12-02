@@ -1,4 +1,4 @@
-<?php
+// app/Services/DecisionTreeService.php
 
 namespace App\Services;
 
@@ -12,12 +12,16 @@ class DecisionTreeService
     }
 
     /**
-     * Build decision tree
+     * Entry point: bangun tree dari dataset tabular generik.
+     *
+     * @param array       $data            array of associative array
+     * @param string      $targetAttribute nama kolom target
+     * @param array|null  $attributes      daftar atribut (null -> semua kolom kecuali target)
      */
     public function buildTree(array $data, string $targetAttribute, ?array $attributes = null): array
     {
         if (empty($data)) {
-            throw new \InvalidArgumentException('Dataset kosong.');
+            throw new \InvalidArgumentException('Dataset kosong; tidak bisa membangun pohon keputusan.');
         }
 
         $firstRow = reset($data);
@@ -26,7 +30,7 @@ class DecisionTreeService
             $attributes = array_values(
                 array_filter(
                     array_keys($firstRow),
-                    fn($col) => $col !== $targetAttribute && strtolower(trim($col)) !== 'no'
+                    fn($col) => $col !== $targetAttribute
                 )
             );
         }
@@ -35,7 +39,7 @@ class DecisionTreeService
     }
 
     /**
-     * Recursive tree building
+     * Fungsi rekursif untuk membangun tree.
      */
     protected function buildTreeRecursive(
         array $data,
@@ -43,17 +47,16 @@ class DecisionTreeService
         string $targetAttribute,
         int $depth = 0
     ): array {
-        // Hitung distribusi kelas
+        // Hitung distribusi kelas di node ini
         $classCounts = [];
         foreach ($data as $row) {
-            // Trim untuk menghindari spasi di CSV
-            $label = trim((string) $row[$targetAttribute]);
+            $label = (string) $row[$targetAttribute];
             $classCounts[$label] = ($classCounts[$label] ?? 0) + 1;
         }
 
         $total = array_sum($classCounts);
 
-        // Semua data punya kelas sama -> leaf
+        // 1) Semua data punya kelas yang sama -> leaf
         if (count($classCounts) === 1) {
             $label = array_key_first($classCounts);
 
@@ -65,7 +68,7 @@ class DecisionTreeService
             ];
         }
 
-        // Tidak ada atribut tersisa -> leaf mayoritas
+        // 2) Tidak ada atribut tersisa -> leaf mayoritas
         if (empty($attributes)) {
             $majorityLabel = array_keys($classCounts, max($classCounts))[0];
 
@@ -77,18 +80,18 @@ class DecisionTreeService
             ];
         }
 
-        // Pilih atribut terbaik
+        // 3) Pilih atribut terbaik (highest gain)
         $bestAttribute = null;
         $maxGain       = -1.0;
 
         foreach ($attributes as $attr) {
             $subsets = $this->groupByAttribute($data, $attr);
 
+            // Skip atribut yang nilai uniknya cuma 1
             if (count($subsets) <= 1) {
                 continue;
             }
 
-            // Pakai Information Gain (ID3) - standar seperti RapidMiner
             $gain = $this->calculationService->calculateGain($data, $attr, $targetAttribute);
 
             if ($gain > $maxGain) {
@@ -97,7 +100,7 @@ class DecisionTreeService
             }
         }
 
-        // Tidak ada atribut berguna -> leaf mayoritas
+        // 4) Kalau tidak ada atribut yang memberi gain positif -> leaf mayoritas
         if ($bestAttribute === null || $maxGain <= 0) {
             $majorityLabel = array_keys($classCounts, max($classCounts))[0];
 
@@ -109,7 +112,7 @@ class DecisionTreeService
             ];
         }
 
-        // Split berdasarkan atribut terbaik
+        // 5) Split data berdasarkan atribut terbaik
         $subsets        = $this->groupByAttribute($data, $bestAttribute);
         $remainingAttrs = array_values(array_diff($attributes, [$bestAttribute]));
 
@@ -142,8 +145,7 @@ class DecisionTreeService
                 continue;
             }
 
-            // Trim untuk konsistensi dengan CalculationService
-            $value = trim((string) $row[$attribute]);
+            $value = $row[$attribute];
             $groups[$value][] = $row;
         }
 

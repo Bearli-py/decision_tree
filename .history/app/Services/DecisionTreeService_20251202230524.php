@@ -26,7 +26,7 @@ class DecisionTreeService
             $attributes = array_values(
                 array_filter(
                     array_keys($firstRow),
-                    fn($col) => $col !== $targetAttribute && strtolower(trim($col)) !== 'no'
+                    fn($col) => $col !== $targetAttribute
                 )
             );
         }
@@ -46,8 +46,7 @@ class DecisionTreeService
         // Hitung distribusi kelas
         $classCounts = [];
         foreach ($data as $row) {
-            // Trim untuk menghindari spasi di CSV
-            $label = trim((string) $row[$targetAttribute]);
+            $label = (string) $row[$targetAttribute];
             $classCounts[$label] = ($classCounts[$label] ?? 0) + 1;
         }
 
@@ -88,7 +87,6 @@ class DecisionTreeService
                 continue;
             }
 
-            // Pakai Information Gain (ID3) - standar seperti RapidMiner
             $gain = $this->calculationService->calculateGain($data, $attr, $targetAttribute);
 
             if ($gain > $maxGain) {
@@ -142,8 +140,7 @@ class DecisionTreeService
                 continue;
             }
 
-            // Trim untuk konsistensi dengan CalculationService
-            $value = trim((string) $row[$attribute]);
+            $value = $row[$attribute];
             $groups[$value][] = $row;
         }
 

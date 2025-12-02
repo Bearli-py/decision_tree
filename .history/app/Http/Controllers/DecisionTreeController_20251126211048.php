@@ -1,0 +1,121 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\ExcelParserService;
+use App\Services\CalculationService;
+use App\Services\DecisionTreeService;
+use Illuminate\Http\Request;
+
+class DecisionTreeController extends Controller
+{
+    protected $excelParser;
+    protected $calculationService;
+    protected $treeService;
+
+    public function __construct(
+        ExcelParserService $excelParser, 
+        CalculationService $calculationService,
+        DecisionTreeService $treeService
+    ) {
+        $this->excelParser = $excelParser;
+        $this->calculationService = $calculationService;
+        $this->treeService = $treeService;
+    }
+
+    /**
+     * Home page
+     */
+   public function index()
+{
+    $token = csrf_token();
+    
+    return <<<HTML
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Decision Tree</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body>
+        <div class="container mt-5">
+            <h1>Upload Dataset</h1>
+            <p>Upload file CSV (.csv) untuk membuat Decision Tree dengan metode ID3</p>
+            
+            <form action="/upload" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="_token" value="$token">
+                <input type="file" name="file" accept=".csv" required>
+                <button type="submit" class="btn btn-primary">Upload</button>
+            </form>
+            
+            <hr>
+            <p><strong>Format file CSV:</strong></p>
+            <p>Kolom: No, Peserta, Budget, Speaker, Topik, Play</p>
+        </div>
+    </body>
+    </html>
+    HTML;
+}
+
+    /**
+     * Handle upload & process
+     */
+public function upload(Request $request)
+{
+    try {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt'
+        ]);
+
+        // STEP 1: Parse CSV
+        $data = $this->excelParser->parseFile($request->file('file'));
+
+        // STEP 2: Calculate metrics
+        $metrics = $this->calculationService->calculateAllMetrics($data);
+
+        // STEP 3: Build tree
+        $tree = $this->treeService->buildTree($data);
+
+        // STEP 4: Store ke session
+        session([
+            'dataset' => $data,
+            'metrics' => $metrics,
+            'tree' => $tree,
+            'file_name' => $request->file('file')->getClientOriginalName()
+        ]);
+
+        // STEP 5: Redirect ke results
+        return redirect('/results');
+
+    } catch (\Exception $e) {
+        return redirect('/')->withErrors(['error' => $e->getMessage()]);
+    }
+}
+```
+
+---
+
+## ✅ **VERIFY FILE results.blade.php ADA**
+
+Check apakah ini **ADA**:
+```
+resources/views/results.blade.php
+resources/views/tree-display.blade.php
+
+    /**
+     * Display results
+     */
+    public function results()
+    {
+        if (!session('dataset')) {
+            return redirect('/');
+        }
+
+        $data = session('dataset');
+        $metrics = session('metrics');
+        $tree = session('tree');
+        $fileName = session('file_name');
+
+        return view('results', compact('data', 'metrics', 'tree', 'fileName'));
+    }
+}
